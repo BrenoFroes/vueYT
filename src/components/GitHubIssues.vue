@@ -23,9 +23,16 @@
                 <div class="form-group">
                 <button class="btn btn-success" @click.prevent.stop="getIssues()">GO</button>
                 <button class="btn btn-danger" @click.prevent.stop="reset()" >LIMPAR</button>
-        </div>
+                </div>
             </div>
         </div>
+
+        <div v-if="response.status === 'error'" class="alert alert-danger">
+
+            {{ response.message }}
+        </div>
+
+
         <br><br><br>
         <table class="table table-sm table-bordered">
             <thead>
@@ -41,12 +48,21 @@
                         <img src="/static/loading.svg" alt="">
                     </td>
                 </tr>
-                <tr vif="!!issues.length && !loader.getIssues" v-for="issue in issues" :key="issue.number">
-                    <td>{{ issue.number }}</td>
+
+                <div v-if="showIssues">
+                    <tr v-for="issue in issues" :key="issue.number">
+                    <td>
+                        <router-link :to="{ name: 'GitHubIssue', params: { name: username, repo: repository, issue: issue.number } }">
+                            {{issue.number}}
+                        </router-link>
+                        
+                    </td>
                     <td>{{ issue.title }}</td>
                     
                 </tr>
-                <tr v-if="!!!issues.length && !loader.getIssues">
+                </div>
+                
+                <tr v-if="noIssues">
                     <td class="text-center" colspan="2">Nenhuma issues encontrada!</td>
                 </tr>
             </tbody>
@@ -61,14 +77,31 @@
             return {
                 username:'',
                 repository:'',
-                issues:'',
-                loader:{
+                issues: [],
+                response: {
+                    status: '',
+                    message: '',
+                },
+                loader: {
                     getIssues: false,
-
+                    
                 }
             }
         },
-        
+
+        created(){
+            this.getLocalData();
+        },
+
+        computed: {
+            showIssues(){
+                return !!this.issues.length && !this.loader.getIssues;
+            },
+            noIssues(){
+                return !this.issues.length && !this.loader.getIssues;
+            }
+        },
+
         methods: {
             reset(){
                 this.username = "";
@@ -79,14 +112,44 @@
             },
             getIssues(){
                 if(this.username && this.repository){
+                    localStorage.setItem('gitHubIssues', JSON.stringify({ username: this.username, repository: this.repository}) );
+
                     this.loader.getIssues = true;
+
                     const url = `https://api.github.com/repos/${this.username}/${this.repository}/issues`;
+
                     axios.get(url).then((response) =>{
                         this.issues = response.data;
                         console.log(response);
-                    }).finally(() =>{
+
+                    }).catch((error) => {
+
+                        console.log(error.response.data);
+                        this.response.status = 'error'
+                        this.response.message = 'Repositório não existe!'
+
+                    }).finally(() => {
+
                         this.loader.getIssues = false;
+
                     });
+                }
+            },
+
+            clearIssue(){
+                this.selectedIssue = {
+
+                };
+            },
+
+            getLocalData(){
+                const localDate = JSON.parse(localStorage.getItem('gitHubIssues'));
+                console.log(localDate);
+
+                if( localDate.username && localDate.repository){
+                    this.username = localDate.username;
+                    this.repository = localDate.repository;
+                    this.getIssues();
                 }
             }
         },
